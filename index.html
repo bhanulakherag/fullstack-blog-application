@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Stack Blog Application</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f4f4f9; color: #333; }
+        header { background: #4f46e5; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; margin-left: 1rem; text-decoration: none; cursor: pointer; font-weight: bold; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+        input, textarea { width: 100%; padding: 0.75rem; margin: 0.5rem 0 1rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #4f46e5; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #4338ca; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>BlogApp</h2>
+        <nav>
+            <a onclick="showPage('home')">Home</a>
+            <a onclick="showPage('login')" id="nav-login">Login</a>
+            <a onclick="showPage('register')" id="nav-register">Register</a>
+            <a onclick="showPage('create')" id="nav-create" class="hidden">Create Blog</a>
+            <a onclick="logout()" id="nav-logout" class="hidden">Logout</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <!-- Home Page -->
+        <div id="page-home" class="page">
+            <h2>All Blog Posts</h2>
+            <div id="blogs-list">Loading blogs...</div>
+        </div>
+
+        <!-- Login Page -->
+        <div id="page-login" class="page hidden">
+            <div class="card">
+                <h2>Login</h2>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Password">
+                <button onclick="login()">Login</button>
+            </div>
+        </div>
+
+        <!-- Register Page -->
+        <div id="page-register" class="page hidden">
+            <div class="card">
+                <h2>Register</h2>
+                <input type="email" id="reg-email" placeholder="Email">
+                <input type="password" id="reg-password" placeholder="Password">
+                <button onclick="register()">Register</button>
+            </div>
+        </div>
+
+        <!-- Create Blog Page -->
+        <div id="page-create" class="page hidden">
+            <div class="card">
+                <h2>Create New Blog</h2>
+                <input type="text" id="blog-title" placeholder="Blog Title">
+                <textarea id="blog-content" rows="6" placeholder="Write content here..."></textarea>
+                <button onclick="createBlog()">Publish Blog</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + pageId).classList.remove('hidden');
+            if (pageId === 'home') fetchBlogs();
+        }
+
+        async function fetchBlogs() {
+            try {
+                const res = await fetch('/api/blogs');
+                const blogs = await res.json();
+                const list = document.getElementById('blogs-list');
+                if (blogs.length === 0) {
+                    list.innerHTML = '<p>No blogs found. Be the first to create one!</p>';
+                    return;
+                }
+                list.innerHTML = blogs.map(b => `
+                    <div class="card">
+                        <h3>${b.title}</h3>
+                        <p>${b.content}</p>
+                        <small><strong>By:</strong> ${b.author} | ${new Date(b.createdAt).toLocaleDateString()}</small>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function register() {
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            alert(data.message || data.error);
+            if (res.ok) showPage('login');
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('user', data.email);
+                alert('Login Successful!');
+                updateAuthUI();
+                showPage('home');
+            } else {
+                alert(data.error);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            updateAuthUI();
+            showPage('home');
+        }
+
+        function updateAuthUI() {
+            const user = localStorage.getItem('user');
+            if (user) {
+                document.getElementById('nav-login').classList.add('hidden');
+                document.getElementById('nav-register').classList.add('hidden');
+                document.getElementById('nav-create').classList.remove('hidden');
+                document.getElementById('nav-logout').classList.remove('hidden');
+            } else {
+                document.getElementById('nav-login').classList.remove('hidden');
+                document.getElementById('nav-register').classList.remove('hidden');
+                document.getElementById('nav-create').classList.add('hidden');
+                document.getElementById('nav-logout').classList.add('hidden');
+            }
+        }
+
+        async function createBlog() {
+            const title = document.getElementById('blog-title').value;
+            const content = document.getElementById('blog-content').value;
+            const author = localStorage.getItem('user');
+            const res = await fetch('/api/blogs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content, author })
+            });
+            if (res.ok) {
+                alert('Blog published successfully!');
+                document.getElementById('blog-title').value = '';
+                document.getElementById('blog-content').value = '';
+                showPage('home');
+            } else {
+                alert('Error publishing blog');
+            }
+        }
+
+        updateAuthUI();
+        fetchBlogs();
+    </script>
+</body>
+</html>
